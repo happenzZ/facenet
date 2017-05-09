@@ -92,3 +92,9 @@ ENV/
 
 # PyCharm project setting
 .idea
+
+# pretrained model
+preModels/
+
+# face datasets
+datasets/
