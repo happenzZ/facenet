@@ -96,5 +96,8 @@ ENV/
 # pretrained model
 preModels/
 
-# face datasets
-datasets/
+# face data
+faceDataset/
+
+# video data
+videos/
