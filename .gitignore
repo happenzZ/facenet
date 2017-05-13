@@ -101,3 +101,6 @@ faceDataset/
 
 # video data
 videos/
+
+# trained model
+src/asset/
