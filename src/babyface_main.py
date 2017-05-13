@@ -196,7 +196,7 @@ def main(args):
             collection = db['kindergarten_1_video_1']
 
             # read video
-            videoPath = '../videos/raw/babyScene_1.MOV'
+            videoPath = '../videos/raw/babyScene_2.MOV'
             capture = cv2.VideoCapture(videoPath)
 
             if not capture.isOpened():
@@ -269,6 +269,23 @@ def main(args):
 
                     image_embeddings = tmp_embeddings
                     image_labels = np.array(range(len(image_embeddings)))
+
+                    for faceIdx in range(bounding_boxes.shape[0]):
+                        faceInfo = {
+                            'faceID': '{0:06}'.format(faceIdx),
+                            'faceName': '{0:06}'.format(faceIdx),
+                            'position': bounding_boxes[faceIdx, 0:4].tolist(),
+                            'emotion': {
+                                "angry": 0.4,
+                                "disgust": 0.3,
+                                "fear": 0.1,
+                                "happy": 0.9,
+                                "sad": 0.4,
+                                "surprise": 0.5,
+                                "neutral": 0.2
+                            }
+                        }
+                        oneFrameInfo['faces'].append(faceInfo)
                 else:
                     nbrs = NearestNeighbors(n_neighbors=2, algorithm='auto').fit(image_embeddings)
                     distances, indices = nbrs.kneighbors(tmp_embeddings)
@@ -280,10 +297,10 @@ def main(args):
                     for idx in range(indices.shape[0]):
                         dist = distances[idx][0]
                         if dist > 0.2:
-                            newlabel = image_embeddings.shape[0]
+                            label = image_embeddings.shape[0]
                             image_embeddings = np.vstack((image_embeddings, tmp_embeddings[idx]))
-                            image_labels = np.hstack((image_labels, newlabel))
-                            cropImgPath = imgPath + '/{}'.format(newlabel)
+                            image_labels = np.hstack((image_labels, label))
+                            cropImgPath = imgPath + '/{}'.format(label)
                             print('cropImgPath: ', cropImgPath)
                             if not os.path.exists(cropImgPath):
                                 os.makedirs(cropImgPath)
@@ -291,6 +308,22 @@ def main(args):
                         else:
                             label = indices[idx][0]
                             print('label, type(label): ', label, type(label))
+
+                        faceInfo = {
+                            'faceID': '{0:06}'.format(label),
+                            'faceName': '{0:06}'.format(label),
+                            'position': bounding_boxes[idx, 0:4].tolist(),
+                            'emotion': {
+                                "angry": 0.4,
+                                "disgust": 0.3,
+                                "fear": 0.1,
+                                "happy": 0.9,
+                                "sad": 0.4,
+                                "surprise": 0.5,
+                                "neutral": 0.2
+                            }
+                        }
+                        oneFrameInfo['faces'].append(faceInfo)
 
                 frame = imutils.resize(frame, width=600)
                 cv2.imshow('frame', frame)
@@ -300,6 +333,8 @@ def main(args):
 
             print('image_embeddings.shape: ', image_embeddings.shape)
             print('image_labels.shape: ', image_labels.shape)
+
+            print('oneFrameInfo: ', oneFrameInfo)
 
             with open('../faceDataset/people/image_embeddings.json', 'w') as wf:
                 json.dump(image_embeddings.tolist(), wf)
