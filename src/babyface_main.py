@@ -16,6 +16,7 @@ import cv2
 import imutils
 import json
 from sklearn.neighbors import NearestNeighbors
+from pymongo import MongoClient
 from matplotlib import pyplot as plt
 
 print('Creating networks and loading parameters')
@@ -40,14 +41,14 @@ def save_image(img, faceRectangles, imgPath):
     return
 
 
-def detect_face(img):
+def detect_face(img, probThreshold):
     # detect face bounding boxes from each frame
     minsize = 20  # minimum size of face
     threshold = [0.6, 0.7, 0.7]  # three steps's threshold
     factor = 0.709  # scale factor
 
     bounding_boxes, _ = align.detect_face.detect_face(img, minsize, pnet, rnet, onet, threshold, factor)
-
+    bounding_boxes = np.array([item for item in filter(lambda x: x[4] > probThreshold, bounding_boxes)])
     return bounding_boxes
 
 
@@ -59,6 +60,9 @@ def crop_face(img, bounding_boxes, image_size, margin):
     prewhitened_images = []
     if nrof_faces > 0:
         for faceIdx in xrange(nrof_faces):
+            # filter out low probability
+            # if bounding_boxes[faceIdx][4] < 0.9:
+            #     continue
             det = np.squeeze(bounding_boxes[faceIdx, 0:4])
             bb = np.zeros(4, dtype=np.int32)
             bb[0] = np.maximum(det[0] - margin / 2, 0)
@@ -173,20 +177,25 @@ def main(args):
             saver.restore(sess, tf.train.latest_checkpoint('asset/train'))
 
             # read from image database
-            train_set = facenet.get_dataset('../videos/result')
+            train_set = facenet.get_dataset('../faceDataset/people')
 
             if not train_set:
                 image_embeddings = []
                 image_labels = []
             else:
-                with open('../videos/result/image_embeddings.json', 'r') as rf:
+                with open('../faceDataset/people/image_embeddings.json', 'r') as rf:
                     image_embeddings = json.load(rf)
-                with open('../videos/result/image_labels.json', 'r') as rf:
+                with open('../faceDataset/people/image_labels.json', 'r') as rf:
                     image_labels = json.load(rf)
-
             image_embeddings = np.array(image_embeddings)
             image_labels = np.array(image_labels)
 
+            # set up database
+            client = MongoClient('localhost', 27017)
+            db = client['test']
+            collection = db['kindergarten_1_video_1']
+
+            # read video
             videoPath = '../videos/raw/babyScene_1.MOV'
             capture = cv2.VideoCapture(videoPath)
 
@@ -233,22 +242,13 @@ def main(args):
                 if fm < 400:
                     continue
 
-                # fm = variance_of_laplacian(gray)
-                # text = "Not Blurry"
-                # threshold = 400
-                #
-                # if fm < threshold:
-                #     text = "Blurry"
-                #
-                # # show the image
-                # cv2.putText(frame, "{}: {:.2f}".format(text, fm), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 3)
-                #
-                # cropImgPath = '../videos/blur'
-                # if not os.path.exists(cropImgPath):
-                #     os.makedirs(cropImgPath)
-                # misc.imsave(cropImgPath+'/{}.jpg'.format(frameIdx), cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                # start one frame
+                oneFrameInfo = {
+                    "frameIdx": frameIdx,
+                    "faces": []
+                }
 
-                bounding_boxes = detect_face(frame)
+                bounding_boxes = detect_face(frame, 0.9)
                 crop_images, prewhitened_images = crop_face(frame, bounding_boxes, args.image_size, args.margin)
                 print('len(crop_images): ', len(crop_images))
 
@@ -257,52 +257,40 @@ def main(args):
                 tmp_embeddings = sess.run(embeddings, feed_dict=feed_dict)
                 print('img_embeddings.shape: ', tmp_embeddings.shape)
 
-                print('img_embeddings: ', tmp_embeddings)
-
-
-                imgPath  = '../videos/result'
-                if not train_set:
+                imgPath = '../faceDataset/people'
+                if image_embeddings.shape[0] == 0:
                     print('not image_embeddings')
-                    print('image_embeddings: ',  image_embeddings)
+                    print('image_embeddings: ', image_embeddings)
                     for idx, cropImg in enumerate(crop_images):
-                        cropImgPath = imgPath+'/{}'.format(idx)
+                        cropImgPath = imgPath + '/{}'.format(idx)
                         if not os.path.exists(cropImgPath):
                             os.makedirs(cropImgPath)
-                        misc.imsave(cropImgPath+'/{}.png'.format(0), cropImg)
-
+                        misc.imsave(cropImgPath + '/{}.png'.format(0), cropImg)
 
                     image_embeddings = tmp_embeddings
                     image_labels = np.array(range(len(image_embeddings)))
                 else:
-                    # image_embeddings = image_embeddings.astype(np.float32)
-                    # image_labels = image_labels.astype(np.float32)
-                    # tmp_embeddings = tmp_embeddings.astype(np.float32)
-                    # print('knn')
-                    # knn = cv2.ml.KNearest_create()
-                    # knn.train(image_embeddings, cv2.ml.ROW_SAMPLE, image_labels)
-                    # ret, results, neighbours, dist = knn.findNearest(tmp_embeddings, 2)
-                    #
-                    # print('ret: ', ret)
-                    # print('results: ', results)
-                    # print('neighbours: ', neighbours)
-                    # print('dist: ', dist)
-
                     nbrs = NearestNeighbors(n_neighbors=2, algorithm='auto').fit(image_embeddings)
                     distances, indices = nbrs.kneighbors(tmp_embeddings)
-
                     print('distances: ', distances)
                     print('indices: ', indices)
+                    print('type(distances): ', type(distances))
+                    print('type(indices): ', type(indices))
 
-                # imgPath = '../videos/test_30'
-                # if not os.path.exists(imgPath):
-                #     os.makedirs(imgPath)
-                # save_image(frame, bounding_boxes, imgPath+'/{}.jpg'.format(frameIdx))
-                #
-                # for idx, cropImg in enumerate(crop_images):
-                #     cropImgPath = imgPath+'/{}'.format(frameIdx)
-                #     if not os.path.exists(cropImgPath):
-                #         os.makedirs(cropImgPath)
-                #     misc.imsave(cropImgPath+'/{}.jpg'.format(idx), cropImg)
+                    for idx in range(indices.shape[0]):
+                        dist = distances[idx][0]
+                        if dist > 0.2:
+                            newlabel = image_embeddings.shape[0]
+                            image_embeddings = np.vstack((image_embeddings, tmp_embeddings[idx]))
+                            image_labels = np.hstack((image_labels, newlabel))
+                            cropImgPath = imgPath + '/{}'.format(newlabel)
+                            print('cropImgPath: ', cropImgPath)
+                            if not os.path.exists(cropImgPath):
+                                os.makedirs(cropImgPath)
+                            misc.imsave(cropImgPath + '/{}.png'.format(0), crop_images[idx])
+                        else:
+                            label = indices[idx][0]
+                            print('label, type(label): ', label, type(label))
 
                 frame = imutils.resize(frame, width=600)
                 cv2.imshow('frame', frame)
@@ -313,10 +301,10 @@ def main(args):
             print('image_embeddings.shape: ', image_embeddings.shape)
             print('image_labels.shape: ', image_labels.shape)
 
-            with open('../videos/result/image_embeddings.json', 'w') as wf:
+            with open('../faceDataset/people/image_embeddings.json', 'w') as wf:
                 json.dump(image_embeddings.tolist(), wf)
 
-            with open('../videos/result/image_labels.json', 'w') as wf:
+            with open('../faceDataset/people/image_labels.json', 'w') as wf:
                 json.dump(image_labels.tolist(), wf)
 
             capture.release()
