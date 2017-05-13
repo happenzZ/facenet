@@ -326,7 +326,7 @@ def get_dataset(paths):
     dataset = []
     for path in paths.split(':'):
         path_exp = os.path.expanduser(path)
-        classes = os.listdir(path_exp)
+        classes = [x for x in os.listdir(path_exp) if os.path.isdir(os.path.join(path_exp, x))]
         classes.sort()
         nrof_classes = len(classes)
         for i in range(nrof_classes):
@@ -336,7 +336,6 @@ def get_dataset(paths):
                 images = os.listdir(facedir)
                 image_paths = [os.path.join(facedir,img) for img in images]
                 dataset.append(ImageClass(class_name, image_paths))
-  
     return dataset
 
 def split_dataset(dataset, split_ratio, mode):
