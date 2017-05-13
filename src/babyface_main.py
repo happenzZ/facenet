@@ -347,7 +347,6 @@ def main(args):
             print('hello world')
 
 
-
             # feed_dict = {images_placeholder: image}
             # print('Start calculating result')
             # max_ind, coin, prelog, embed = sess.run([max_index, confidence, prelogits, embeddings], feed_dict=feed_dict)

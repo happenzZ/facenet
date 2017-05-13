@@ -1,12 +1,104 @@
+import cv2
+from scipy import misc
+import imutils
+
+
+def save_image(img, faceRectangles, imgPath):
+    # # Draw a rectangle around the faces
+    for faceIdx, (left, top, right, bottom, p) in enumerate(faceRectangles):
+        cv2.rectangle(img, (int(left), int(top)), (int(right), int(bottom)), (0, 255, 0), 2)
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(img, 'faceIdx: {}'.format(faceIdx), (int(left), int(top)), font, 1, (0, 0, 255), 1, cv2.LINE_AA)
+    misc.imsave(imgPath, img)
+    return
+
+
+def variance_of_laplacian(image):
+    # compute the Laplacian of the image and then return the focus
+    #  measure, which is simply the variance of the Laplacian
+    return cv2.Laplacian(image, cv2.CV_64F).var()
+
+
+# read video
+videoPath = '../videos/raw/IMG_7378.MOV'
+capture = cv2.VideoCapture(videoPath)
+
+if not capture.isOpened():
+    print("could not open :", videoPath)
+else:
+    totalFrame = capture.get(cv2.CAP_PROP_FRAME_COUNT)
+    width = capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+    height = capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    fps = capture.get(cv2.CAP_PROP_FPS)
+
+    videoFormat = capture.get(cv2.CAP_PROP_FORMAT)
+
+    print('totalFrame: ', totalFrame)
+    print('width: ', width)
+    print('height: ', height)
+    print('fps: ', fps)
+    print('videoFormat: ', videoFormat)
+
+frameIdx = 0
+while True:
+    frameIdx += 1
+    print('frameIdx: ', frameIdx)
+    # grab the current frame
+    (grabbed, frame) = capture.read()
+
+    # if we are viewing a video and we did not grab a frame,
+    # then we have reached the end of the video
+    if not grabbed:
+        break
+
+    if frameIdx % 30 != 0:
+        continue
+
+    if frameIdx > 400:
+        break
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    fm = variance_of_laplacian(gray)
+
+    # detect blur
+    if fm < 400:
+        continue
+
+    frame = imutils.resize(frame, width=600)
+    cv2.imshow('frame', frame)
+    ck = cv2.waitKey(30) & 0xFF
+    if ck == 27:
+        break
+
+
+capture.release()
+cv2.destroyAllWindows()
+print('hello world')
+
+
+
+
+
+
+
+
+
+
+
+
+
 # #####################################
 #  Test mongodb
 # #####################################
-from pymongo import MongoClient
-
-client = MongoClient('localhost', 27017)
-
-db = client['test']
-coll = db['kindergarten_1_video_1']
+# from pymongo import MongoClient
+#
+# client = MongoClient('localhost', 27017)
+#
+# db = client['test']
+# coll = db['kindergarten_1_video_1']
 
 # result = coll.insert_one(
 #         {
@@ -44,10 +136,10 @@ coll = db['kindergarten_1_video_1']
 #         }
 # )
 
-
-cursor = coll.find()
-for document in cursor:
-    print(document)
+#
+# cursor = coll.find()
+# for document in cursor:
+#     print(document)
 
 
 
