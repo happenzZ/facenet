@@ -11,13 +11,13 @@ import sys
 import os
 import numpy as np
 import tensorflow as tf
-from src.faceExpression.cnn.convnet.sequential_net import Layer, SequentialNet
-from src.faceExpression.cnn.convnet.classifier import Classifier
-from src.faceExpression.cnn.convnet import utils
-from src.faceExpression.cnn.convnet.utils import \
+from faceExpression.cnn.convnet.sequential_net import Layer, SequentialNet
+from faceExpression.cnn.convnet.classifier import Classifier
+from faceExpression.cnn.convnet import utils
+from faceExpression.cnn.convnet.utils import \
     get_activation, get_learning_rate, get_optimizer, \
     get_regularizer, get_loss_func, output_shape, get_path, config_proto
-from src.faceExpression.cnn.convnet.message_protoc.log_message import create_training_log_message, add_evaluation_log_message, \
+from faceExpression.cnn.convnet.message_protoc.log_message import create_training_log_message, add_evaluation_log_message, \
     log_beautiful_print
 
 SEED = None

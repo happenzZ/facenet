@@ -3,8 +3,8 @@ from collections import Counter
 import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 
-from src.faceExpression.cnn.data.preprocess import maybe_calculate
-from src.faceExpression.cnn.convnet.utils import get_path
+from faceExpression.cnn.data.preprocess import maybe_calculate
+from faceExpression.cnn.convnet.utils import get_path
 
 IMG_SIZE = (48, 48)
 BATCH_SIZE = 64

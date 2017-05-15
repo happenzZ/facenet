@@ -18,7 +18,7 @@ import json
 import random
 from sklearn.neighbors import NearestNeighbors
 from pymongo import MongoClient
-from src.faceExpression.model_face_zhp import build_model
+from faceExpression.model_face_zhp import build_model
 
 print('Creating networks and loading parameters')
 with tf.Graph().as_default():
@@ -422,11 +422,11 @@ def main(args):
                 print('oneFrameInfo: ', oneFrameInfo)
                 kdgt_video_coll.insert_one(oneFrameInfo)
 
-                frame = imutils.resize(frame, width=600)
-                cv2.imshow('frame', frame)
-                ck = cv2.waitKey(30) & 0xFF
-                if ck == 27:
-                    break
+                #frame = imutils.resize(frame, width=600)
+                #cv2.imshow('frame', frame)
+                #ck = cv2.waitKey(30) & 0xFF
+                #if ck == 27:
+                #    break
 
             video_info_doc = {
                 'kdgtName': kindergartenName,
