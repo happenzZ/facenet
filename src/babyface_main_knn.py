@@ -15,8 +15,10 @@ from scipy import misc
 import cv2
 import imutils
 import json
+import random
 from sklearn.neighbors import NearestNeighbors
 from pymongo import MongoClient
+from src.faceExpression.model_face_zhp import build_model
 
 print('Creating networks and loading parameters')
 with tf.Graph().as_default():
@@ -27,14 +29,72 @@ with tf.Graph().as_default():
     with sess.as_default():
         pnet, rnet, onet = align.detect_face.create_mtcnn(sess, './align/')
 
+print('Creating MTCNN network for face detection')
 network = importlib.import_module('models.inception_resnet_v1', 'inference')
 
+print('Creating networks for face expression')
+faceExpressionModel = build_model(4, 'CustomModelName')
+faceExpressionModel.restore()
+
+# data = np.array([])
+# imagePath1 = '/Users/zhp/Project/facenet/faceDataset/test/1/0.png'
+# imagePath2 = '/Users/zhp/Project/facenet/faceDataset/test/6/0.png'
+# image1 = cv2.imread(imagePath1)
+# image2 = cv2.imread(imagePath2)
+#
+# image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
+# image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
+# reimage1 = cv2.resize(image1, (48, 48))
+# reimage2 = cv2.resize(image2, (48, 48))
+#
+#
+# data = reimage1
+# data = np.vstack((data, reimage2))
+#
+# data = data.astype(np.float32) / 255 - 0.5
+# print('data.shape: ', data.shape)
+#
+# data = np.array(data, dtype=np.uint8).reshape((-1, 48, 48, 1))
+#
+# print('data.shape: ', data.shape)
+#
+# logits, predictions = faceExpressionModel.infer_in_batches(faceExpressionModel.sess, data, batch_size=data.shape[0])
+#
+# print('logits: ', logits)
+# print('predictions: ', predictions)
+
+
+
 # variable setting
+videoName = 'IMG_7378'
+videoID = '000001'
+kindergartenName = 'Matsubara'
+kindergartenID = '000001'
+frameInterval = 10
+
+
 facePath = '../faceDataset/people_IMG_7378'
-videoPath = '../videos/raw/IMG_7378.MOV'
+videoPath = '../videos/raw/{}.MOV'.format(videoName)
 n_neighbors = 5
 distance_threshold = 0.4
 blur_threshold = 100
+emotion_category = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+
+
+def emotion_mapping(emotion_prediction):
+    emotion_prob = {}
+    for idx, category in enumerate(emotion_category):
+        emotion_prob[category] = float(emotion_prediction[idx])
+    return emotion_prob
+
+
+def face_expression(images):
+    # get face expression
+    images = np.array(images, dtype=np.uint8).reshape((-1, 48, 48, 1))
+    images = images.astype(np.float32) / 255 - 0.5
+    _, emotion_predictions = faceExpressionModel.infer_in_batches(faceExpressionModel.sess, images,
+                                                                  batch_size=images.shape[0])
+    return emotion_predictions
 
 
 def processing_image(image_paths):
@@ -75,14 +135,21 @@ def get_dataset(path, sess, images_placeholder, embeddings):
                 image_embeddings = tmp_embeddings
             else:
                 image_embeddings = np.vstack((image_embeddings, tmp_embeddings))
-            image_labels = np.hstack((image_labels, [class_name]*tmp_embeddings.shape[0]))
+            image_labels = np.hstack((image_labels, [class_name] * tmp_embeddings.shape[0]))
     return image_embeddings, image_labels
+
+
+def get_people(path):
+    classes = [x for x in os.listdir(path) if os.path.isdir(os.path.join(path, x))]
+    classes.remove('known')
+    classes.remove('unknown')
+    return classes
 
 
 def knn_judge(dist, ind, image_labels):
     label_distIdx = {}
     label_count = []
-    label_list = []   # just record label
+    label_list = []  # just record label
     for idx in range(ind.shape[0]):
         label = image_labels[ind[idx]]
         if label not in label_distIdx:
@@ -126,6 +193,7 @@ def crop_face(img, bounding_boxes, image_size, margin):
     nrof_faces = bounding_boxes.shape[0]
     crop_images = []
     prewhitened_images = []
+    grayed_images = []
     if nrof_faces > 0:
         for faceIdx in xrange(nrof_faces):
             # filter out low probability
@@ -139,10 +207,13 @@ def crop_face(img, bounding_boxes, image_size, margin):
             bb[3] = np.minimum(det[3] + margin / 2, img_size[0])
             cropped = img[bb[1]:bb[3], bb[0]:bb[2], :]
             aligned = misc.imresize(cropped, (image_size, image_size), interp='bilinear')
+            grayed = cv2.cvtColor(aligned, cv2.COLOR_RGB2GRAY)
+            grayed = cv2.resize(grayed, (48, 48))
             prewhitened = facenet.prewhiten(aligned)
             crop_images.append(aligned)
             prewhitened_images.append(prewhitened)
-    return crop_images, prewhitened_images
+            grayed_images.append(grayed)
+    return crop_images, prewhitened_images, grayed_images
 
 
 def variance_of_laplacian(image):
@@ -171,7 +242,15 @@ def process_frame(frame, image_size, margin):
 
 
 def main(args):
-    #    with tf.Graph().as_default():
+    # mongodb
+    client = MongoClient('localhost', 27017)
+    db = client['babyface']
+    # collections
+    video_info = db['video_info']
+    people_info = db['people_info']
+    people = db['people']
+
+    # with tf.Graph().as_default():
     tf.set_random_seed(args.seed)
     g = tf.Graph()
     with g.as_default():
@@ -199,34 +278,62 @@ def main(args):
             # get database image embeddings and labels
             image_embeddings, image_labels = get_dataset(facePath, sess, images_placeholder, embeddings)
 
-            print('image_embeddings: ', image_embeddings)
-            print('image_labels: ', image_labels)
             print('image_embeddings.shape', image_embeddings.shape)
             print('image_labels.shape', image_labels.shape)
+
+            # mongodb create people collection doc
+            people_video = {}
+
+            # mongodb create people info
+            people_list = get_people(facePath)
+            for idx in range(len(people_list)):
+                people_info_doc = {
+                    'personID': people_list[idx],
+                    'personName': people_list[idx],
+                    'age': random.randint(1, 10),
+                    'height': random.uniform(80, 120),
+                    'imageFolder': os.path.abspath(os.path.join(facePath, people_list[idx]))
+                }
+                people_info.insert_one(people_info_doc)
+
+                people_video[people_list[idx]] = {
+                    'personID': people_list[idx],
+                    'personName': people_list[idx],
+                    'videoID': videoID,
+                    'videoName': videoName,
+                    'videoURL': os.path.abspath(videoPath),
+                    'record': []
+                }
+
+            # mongodb create kindergarten_1_video_1 collection
+            kdgt_video = '{}_{}'.format(kindergartenName, videoName)
+
+            kdgt_video_coll = db[kdgt_video]
 
             # read video
             capture = cv2.VideoCapture(videoPath)
 
             if not capture.isOpened():
                 print("could not open :", videoPath)
+                return
             else:
                 totalFrame = capture.get(cv2.CAP_PROP_FRAME_COUNT)
-                width = capture.get(cv2.CAP_PROP_FRAME_WIDTH)
-                height = capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                frameWidth = capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+                frameHeight = capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
                 fps = capture.get(cv2.CAP_PROP_FPS)
 
                 videoFormat = capture.get(cv2.CAP_PROP_FORMAT)
 
                 print('totalFrame: ', totalFrame)
-                print('width: ', width)
-                print('height: ', height)
+                print('width: ', frameWidth)
+                print('height: ', frameHeight)
                 print('fps: ', fps)
                 print('videoFormat: ', videoFormat)
 
+            frameNum = 0
             frameIdx = -1
             while True:
                 frameIdx += 1
-                print('frameIdx: ', frameIdx)
                 # grab the current frame
                 (grabbed, frame) = capture.read()
 
@@ -235,12 +342,13 @@ def main(args):
                 if not grabbed:
                     break
 
-                if frameIdx % 30 != 0:
+                if frameIdx % frameInterval != 0:
                     continue
 
-                if frameIdx > 400:
-                    break
+                # if frameIdx > 400:
+                #     break
 
+                frameNum += 1
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -250,6 +358,8 @@ def main(args):
                 if fm < blur_threshold:
                     continue
 
+                print('frameIdx: ', frameIdx)
+
                 # start one frame
                 oneFrameInfo = {
                     "frameIdx": frameIdx,
@@ -257,13 +367,16 @@ def main(args):
                 }
 
                 bounding_boxes = detect_face(frame, 0.9)
-                crop_images, prewhitened_images = crop_face(frame, bounding_boxes, args.image_size, args.margin)
+                crop_images, prewhitened_images, grayed_images = crop_face(frame, bounding_boxes, args.image_size,
+                                                                           args.margin)
                 print('len(crop_images): ', len(crop_images))
 
                 feed_dict = {images_placeholder: prewhitened_images}
                 print('Start calculating result')
                 tmp_embeddings = sess.run(embeddings, feed_dict=feed_dict)
                 print('img_embeddings.shape: ', tmp_embeddings.shape)
+
+                emotion_predictions = face_expression(grayed_images)
 
                 if image_embeddings.shape[0] == 0:
                     print('not image_embeddings, error!')
@@ -272,16 +385,16 @@ def main(args):
                 # KNN find neighbors
                 nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm='auto').fit(image_embeddings)
                 distances, indices = nbrs.kneighbors(tmp_embeddings)
-                print('distances: ', distances)
-                print('indices: ', indices)
+                # print('distances: ', distances)
+                # print('indices: ', indices)
 
                 for idx in range(indices.shape[0]):
                     dist = distances[idx]
                     ind = indices[idx]
 
                     distance, label = knn_judge(dist, ind, image_labels)
-                    print('distance: ', distance)
-                    print('label: ', label)
+                    # print('distance: ', distance)
+                    # print('label: ', label)
                     if distance > distance_threshold:
                         savePath = facePath + '/{}'.format('unknown')
                     else:
@@ -295,17 +408,19 @@ def main(args):
                         'faceID': '{}'.format(label),
                         'faceName': '{}'.format(label),
                         'position': bounding_boxes[idx, 0:4].tolist(),
-                        'emotion': {
-                            "angry": 0.4,
-                            "disgust": 0.3,
-                            "fear": 0.1,
-                            "happy": 0.9,
-                            "sad": 0.4,
-                            "surprise": 0.5,
-                            "neutral": 0.2
-                        }
+                        'emotion': emotion_mapping(emotion_predictions[idx])
                     }
                     oneFrameInfo['faces'].append(faceInfo)
+
+                    if distance < distance_threshold:
+                        people_video[label]['record'].append({
+                            'frameID': frameIdx,
+                            'position': bounding_boxes[idx, 0:4].tolist(),
+                            'emotion': emotion_category[np.argmax(emotion_predictions[idx])]
+                        })
+
+                print('oneFrameInfo: ', oneFrameInfo)
+                kdgt_video_coll.insert_one(oneFrameInfo)
 
                 frame = imutils.resize(frame, width=600)
                 cv2.imshow('frame', frame)
@@ -313,9 +428,30 @@ def main(args):
                 if ck == 27:
                     break
 
-            print('image_embeddings.shape: ', image_embeddings.shape)
-            print('image_labels.shape: ', image_labels.shape)
-            print('oneFrameInfo: ', oneFrameInfo)
+            video_info_doc = {
+                'kdgtName': kindergartenName,
+                'kdgtID': kindergartenID,
+                'videoName': videoName,
+                'videoID': videoID,
+                'videoURL': os.path.abspath(videoPath),
+                'totalFrame': totalFrame,
+                'frameWidth': frameWidth,
+                'frameHeight': frameHeight,
+                'fps': fps,
+                'frameInterval': frameInterval,
+                'frameNum': frameNum
+            }
+
+            video_info.insert_one(video_info_doc)
+
+            # mongodb insert people document
+            for idx in range(len(people_list)):
+                people_doc = people_video[people_list[idx]]
+                people.insert_one(people_doc)
+
+            # print('image_embeddings.shape: ', image_embeddings.shape)
+            # print('image_labels.shape: ', image_labels.shape)
+            # print('oneFrameInfo: ', oneFrameInfo)
             capture.release()
             cv2.destroyAllWindows()
             print('hello world')
