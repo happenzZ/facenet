@@ -1,39 +1,118 @@
+
 import numpy as np
 
-dist = np.array([3.3, 5.2, 9.7])
-ind = np.array([2, 4, 1])
-image_labels = np.array(['a', 'b', 'b', 'd', 'e'])
+emotion_category = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+a = np.array([4, 6, 2.0, 9.5, 3.9])
+
+print(np.argmax(a))
+print(type(np.argmax(a)))
+
+print(emotion_category[np.argmax(a)])
+# import os
+#
+# facePath = '../faceDataset/people_IMG_7378'
+#
+# classes = [x for x in os.listdir(facePath) if os.path.isdir(os.path.join(facePath, x))]
+# classes.remove('known')
+# classes.remove('unknown')
+# print('classes: ', classes)
+#
+#
+# print(os.path.abspath(os.path.join(facePath, classes[0])))
+
+# import numpy as np
+#
+# c = []
+# a = np.array([[[1.0,2], [3,4]], [[5,6], [7,8]]])
+#
+# c = [a[0], a[1]]
+#
+#
+# print('a: ', a)
+# print('a.shape: ', a.shape)
+#
+# b = np.array(a, dtype=np.float32).reshape((-1, 2, 2, 1))
+# print('b.shape: ', b.shape)
+# print('b: ', b)
+#
+# e = np.array(c, dtype=np.uint8).reshape((-1, 2, 2, 1))
+# print('e.shape: ', e.shape)
+# print('e: ', e)
+
+# from scipy import misc
+# import cv2
+# import numpy as np
+#
+# image = misc.imread('/Users/zhp/Project/facenet/faceDataset/test/0/0.png')
+# # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+#
+# aligned = misc.imresize(image, (80, 80), interp='bilinear')
+#
+# grayed = cv2.cvtColor(aligned, cv2.COLOR_RGB2GRAY)
+#
+# cv2.imshow('name', grayed)
+# ck = cv2.waitKey(0)
+# cv2.destroyAllWindows()
 
 
-def knn_judge(dist, ind, image_labels):
-    label_distIdx = {}
-    label_count = []
-    label_list = []   # just record label
-    for idx in range(ind.shape[0]):
-        label = image_labels[ind[idx]]
-        if label not in label_distIdx:
-            label_distIdx[label] = []
-        label_distIdx[label].append(idx)
-        if label not in label_list:
-            label_list.append(label)
-    for label in label_list:
-        label_count.append([label, len(label_distIdx[label])])
 
-    print(sorted(label_count, key=lambda x: x[1], reverse=True))
 
-    print('label_distIdx: ', label_distIdx)
-    print('label_count: ', label_count)
-    print('label_list: ', label_list)
 
-    label = sorted(label_count, key=lambda x: x[1], reverse=True)[0][0]
-    distance = np.mean(dist[label_distIdx[label]])
+#
+#
+# size = 10
+# batch_size = 10
+# for begin in range(0, size, batch_size):
+#     print('begin: ', begin)
+#     end = begin + batch_size
+#     print('end: ', end)
+#     if end > size:
+#         end = size
+#     print('end: ', end)
 
-    print('label: ', label)
-    print(label_distIdx[label])
-    print(dist[label_distIdx[label]])
-    print('distance: ', distance)
 
-knn_judge(dist, ind, image_labels)
+
+
+
+
+
+
+# import numpy as np
+#
+# dist = np.array([3.3, 5.2, 9.7])
+# ind = np.array([2, 4, 1])
+# image_labels = np.array(['a', 'b', 'b', 'd', 'e'])
+#
+#
+# def knn_judge(dist, ind, image_labels):
+#     label_distIdx = {}
+#     label_count = []
+#     label_list = []   # just record label
+#     for idx in range(ind.shape[0]):
+#         label = image_labels[ind[idx]]
+#         if label not in label_distIdx:
+#             label_distIdx[label] = []
+#         label_distIdx[label].append(idx)
+#         if label not in label_list:
+#             label_list.append(label)
+#     for label in label_list:
+#         label_count.append([label, len(label_distIdx[label])])
+#
+#     print(sorted(label_count, key=lambda x: x[1], reverse=True))
+#
+#     print('label_distIdx: ', label_distIdx)
+#     print('label_count: ', label_count)
+#     print('label_list: ', label_list)
+#
+#     label = sorted(label_count, key=lambda x: x[1], reverse=True)[0][0]
+#     distance = np.mean(dist[label_distIdx[label]])
+#
+#     print('label: ', label)
+#     print(label_distIdx[label])
+#     print(dist[label_distIdx[label]])
+#     print('distance: ', distance)
+#
+# knn_judge(dist, ind, image_labels)
 
 # from collections import Counter
 # import numpy as np
@@ -69,18 +148,6 @@ knn_judge(dist, ind, image_labels)
 # print(e)
 # print(type(e))
 #
-
-
-
-# from scipy import misc
-# import cv2
-#
-#
-# image = misc.imread('/Users/zhp/Project/facenet/faceDataset/test/0/0.png')
-# image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-# cv2.imshow('name', image)
-# ck = cv2.waitKey(0)
-# cv2.destroyAllWindows()
 
 
 
