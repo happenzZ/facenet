@@ -1,3 +1,24 @@
+# pretrained model
+preModels/
+
+# face data
+faceDataset/
+
+# video data
+videos/
+
+# trained model
+src/asset/
+
+# face expression
+src/faceExpression/data
+src/faceExpression/log
+src/faceExpression/models
+
+
+
+###############################
+
 led / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -93,14 +114,3 @@ ENV/
 # PyCharm project setting
 .idea
 
-# pretrained model
-preModels/
-
-# face data
-faceDataset/
-
-# video data
-videos/
-
-# trained model
-src/asset/
